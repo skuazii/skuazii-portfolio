@@ -1,0 +1,890 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Portfolio de miniatures Minecraft — créations sur-mesure pour vidéos et chaînes YouTube.">
+<title>MC Miniatures — Portfolio</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%23ffffff'/%3E%3Cstop offset='1' stop-color='%23a9c9e8'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath fill='url(%23g)' d='M16 2c6 8 9 13 9 17a9 9 0 1 1-18 0c0-4 3-9 9-17z'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore-compat.js"></script>
+<style>
+  :root{
+    --bg-a:#eef3f7;
+    --bg-b:#f9fbfd;
+    --bg-c:#e4edf3;
+    --glass:rgba(255,255,255,0.16);
+    --glass-strong:rgba(255,255,255,0.32);
+    --glass-border:rgba(255,255,255,0.55);
+    --text:#20262d;
+    --muted:#6b7684;
+    --accent:#7fb8d4;
+    --accent2:#a9c9e8;
+    --shadow: 0 8px 32px rgba(31,45,61,0.10);
+    --radius:22px;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html{scroll-behavior:smooth;}
+  body{
+    font-family:'Inter', sans-serif;
+    background:
+      radial-gradient(ellipse 70% 45% at 15% 0%, rgba(160,205,230,0.55), transparent),
+      radial-gradient(ellipse 65% 45% at 90% 10%, rgba(200,225,240,0.5), transparent),
+      radial-gradient(ellipse 70% 50% at 50% 100%, rgba(190,215,235,0.4), transparent),
+      linear-gradient(160deg, var(--bg-a), var(--bg-b) 55%, var(--bg-c));
+    color:var(--text);
+    min-height:100vh;
+    overflow-x:hidden;
+    position:relative;
+  }
+  .display{ font-family:'Outfit', sans-serif; }
+
+  /* ---------- ambient liquid blobs ---------- */
+  .blob-field{ position:fixed; inset:0; z-index:0; overflow:hidden; pointer-events:none; }
+  .blob{
+    position:absolute; border-radius:50%; filter:blur(60px); opacity:0.55;
+    animation: drift 24s ease-in-out infinite;
+    background: radial-gradient(circle at 30% 30%, #ffffff, var(--accent2) 60%, transparent 75%);
+  }
+  .blob.b1{ width:460px; height:460px; top:-14%; left:-10%; animation-duration:28s;}
+  .blob.b2{ width:400px; height:400px; top:10%; right:-12%; animation-duration:22s; animation-delay:-5s; opacity:0.4;}
+  .blob.b3{ width:360px; height:360px; bottom:-14%; left:22%; animation-duration:32s; animation-delay:-12s;}
+  .blob.b4{ width:280px; height:280px; bottom:6%; right:12%; opacity:0.35; animation-duration:26s; animation-delay:-8s;}
+  @keyframes drift{
+    0%,100%{ transform:translate(0,0) scale(1); }
+    33%{ transform:translate(50px,60px) scale(1.1); }
+    66%{ transform:translate(-35px,-30px) scale(0.92); }
+  }
+  @media (prefers-reduced-motion:reduce){ .blob{ animation:none; } html{scroll-behavior:auto;} }
+
+  /* ---------- glass base with reflection sheen ---------- */
+  .glass{
+    position:relative;
+    background:var(--glass);
+    border:1px solid var(--glass-border);
+    backdrop-filter: blur(36px) saturate(200%);
+    -webkit-backdrop-filter: blur(36px) saturate(200%);
+    border-radius:var(--radius);
+    box-shadow: var(--shadow), inset 0 1px 0 rgba(255,255,255,0.85), inset 0 -1px 0 rgba(255,255,255,0.1);
+    overflow:hidden;
+  }
+  .glass::before{
+    content:"";
+    position:absolute; top:0; left:0; right:0; height:60%;
+    background: linear-gradient(160deg, rgba(255,255,255,0.4) 0%, rgba(255,255,255,0.05) 45%, transparent 70%);
+    pointer-events:none;
+  }
+  .glass::after{
+    content:"";
+    position:absolute; top:-40%; left:-30%; width:60%; height:180%;
+    background: linear-gradient(100deg, transparent 40%, rgba(255,255,255,0.45) 50%, transparent 60%);
+    transform: rotate(8deg);
+    pointer-events:none;
+    opacity:0.5;
+    animation: sheen-move 9s ease-in-out infinite;
+  }
+  @keyframes sheen-move{
+    0%, 100%{ left:-30%; }
+    50%{ left:70%; }
+  }
+  @media (prefers-reduced-motion:reduce){ .glass::after{ animation:none; } }
+
+  /* water droplet: a small glinting highlight like a bead of water on glass */
+  .droplet{
+    position:absolute; border-radius:50%; pointer-events:none;
+    background: radial-gradient(circle at 32% 28%, rgba(255,255,255,0.95), rgba(255,255,255,0.25) 40%, transparent 70%);
+    box-shadow: inset 0 0 6px rgba(255,255,255,0.6), 0 2px 6px rgba(120,170,200,0.25);
+    animation: droplet-float 7s ease-in-out infinite;
+  }
+  @keyframes droplet-float{
+    0%,100%{ transform:translateY(0) scale(1); }
+    50%{ transform:translateY(6px) scale(1.06); }
+  }
+  @media (prefers-reduced-motion:reduce){ .droplet{ animation:none; } }
+
+  /* ---------- layout shell ---------- */
+  .wrap{ position:relative; z-index:1; max-width:1080px; margin:0 auto; padding:30px 20px 90px; }
+
+  header.top{ display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:36px; }
+  .brand{ display:flex; align-items:center; gap:12px; }
+  .brand-block{
+    width:30px; height:30px; border-radius:9px;
+    background: linear-gradient(150deg, #ffffff, var(--accent2));
+    box-shadow: inset 0 1px 3px rgba(255,255,255,0.9), 0 2px 8px rgba(120,170,200,0.4);
+  }
+  .brand-name{ font-family:'Outfit', sans-serif; font-weight:600; font-size:18px; letter-spacing:0.2px; color:var(--text); }
+  .brand-name span{ color:var(--accent); font-weight:300; }
+
+  .lock-btn{
+    display:flex; align-items:center; gap:8px;
+    background:var(--glass); border:1px solid var(--glass-border);
+    backdrop-filter: blur(20px) saturate(180%); -webkit-backdrop-filter: blur(20px) saturate(180%);
+    color:var(--muted); font-size:13px; font-weight:500;
+    padding:9px 16px; border-radius:999px; cursor:pointer;
+    transition: all .25s ease; box-shadow: var(--shadow);
+    position:relative; overflow:hidden;
+  }
+  .lock-btn:hover{ color:var(--text); transform:translateY(-1px); }
+  .lock-btn.unlocked{ color:#2f8f5b; }
+
+  /* ---------- liquid glass tab bar ---------- */
+  nav.tabs{
+    display:flex; gap:4px; padding:6px;
+    background:var(--glass); border:1px solid var(--glass-border);
+    backdrop-filter: blur(30px) saturate(180%); -webkit-backdrop-filter: blur(30px) saturate(180%);
+    border-radius:999px; width:fit-content; margin:0 auto 48px; max-width:100%;
+    overflow-x:auto; box-shadow: var(--shadow), inset 0 1px 0 rgba(255,255,255,0.9);
+    position:relative;
+  }
+  nav.tabs button{
+    position:relative; border:none; background:transparent; color:var(--muted);
+    font-family:'Inter', sans-serif; font-size:14px; font-weight:500; padding:11px 22px;
+    border-radius:999px; cursor:pointer; white-space:nowrap; transition: color .3s ease;
+    z-index:1;
+  }
+  nav.tabs button.active{ color:#1a2027; }
+  nav.tabs button .tab-bg{
+    position:absolute; inset:0; border-radius:999px; z-index:-1; opacity:0;
+    background: linear-gradient(135deg, #ffffff, var(--accent2));
+    box-shadow: 0 4px 14px rgba(120,170,200,0.35), inset 0 1px 0 rgba(255,255,255,0.9);
+    transition: opacity .3s ease;
+  }
+  nav.tabs button.active .tab-bg{ opacity:1; }
+
+  section.panel{ display:none; animation: fadeUp .5s ease; }
+  section.panel.active{ display:block; }
+  @keyframes fadeUp{ from{ opacity:0; transform:translateY(10px);} to{opacity:1; transform:translateY(0);} }
+
+  /* ---------- hero ---------- */
+  .hero{ text-align:center; padding:56px 24px 60px; margin-bottom:10px; }
+  .hero .spotlight{
+    position:absolute; inset:0; pointer-events:none; opacity:0; border-radius:inherit;
+    background: radial-gradient(420px circle at var(--mx,50%) var(--my,20%), rgba(255,255,255,0.5), transparent 60%);
+    transition: opacity .4s ease;
+  }
+  .hero:hover .spotlight{ opacity:1; }
+  @media (prefers-reduced-motion:reduce){ .hero .spotlight{ display:none; } }
+  .eyebrow{ color:var(--accent); font-size:11px; letter-spacing:3px; text-transform:uppercase; margin-bottom:20px; font-weight:600; }
+  .hero h1{
+    font-family:'Outfit', sans-serif; font-weight:300;
+    font-size:clamp(30px, 6vw, 54px); line-height:1.15; letter-spacing:-0.5px;
+    color:var(--text); margin-bottom:20px;
+  }
+  .hero h1 b{ font-weight:700; }
+  .hero p{ color:var(--muted); font-size:16px; max-width:480px; margin:0 auto 30px; line-height:1.65; }
+  .hero-stats{ display:flex; gap:14px; justify-content:center; flex-wrap:wrap; }
+  .stat{ padding:16px 26px; min-width:110px; }
+  .stat .num{ font-family:'Outfit', sans-serif; font-size:24px; font-weight:700; }
+  .stat .label{ font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:1px; margin-top:3px; }
+
+  /* ---------- gallery ---------- */
+  .gallery-head{ display:flex; align-items:baseline; justify-content:space-between; margin-bottom:22px; flex-wrap:wrap; gap:10px;}
+  .gallery-head h2{ font-family:'Outfit', sans-serif; font-size:22px; font-weight:600; }
+  .gallery-head .count{ color:var(--muted); font-size:13px; }
+  /* ---------- carrousel empilé avec flou d'arrière-plan ---------- */
+  .carousel-wrap{ display:flex; align-items:center; gap:14px; max-width:min(1300px, 94vw); margin:0 auto 26px; height:clamp(300px, 40vw, 560px); }
+  .car-stage{
+    flex:1; position:relative; height:100%; touch-action:pan-y;
+    --tx-offset: clamp(118px, 18vw, 300px);
+  }
+  .car-slot{
+    position:absolute; top:50%; left:50%; width:clamp(270px, 36vw, 560px); aspect-ratio:16/9;
+    transition: transform .55s cubic-bezier(.22,.9,.28,1), filter .55s ease, opacity .55s ease;
+    will-change:transform, filter, opacity;
+  }
+  .car-slot .car-card-inner{ width:100%; height:100%; padding:0; }
+  @media (prefers-reduced-motion:reduce){ .car-slot{ transition:none; } }
+  @media (max-width:560px){
+    .car-slot{ width:210px; }
+    .car-stage{ --tx-offset: 118px; }
+    .carousel-wrap{ height:230px; gap:8px; }
+  }
+
+  .car-nav{
+    width:44px; height:44px; border-radius:50%; border:1px solid var(--glass-border);
+    background:var(--glass); backdrop-filter: blur(20px) saturate(180%); -webkit-backdrop-filter: blur(20px) saturate(180%);
+    display:flex; align-items:center; justify-content:center; font-size:20px; color:var(--text);
+    cursor:pointer; box-shadow:var(--shadow); flex-shrink:0; z-index:20;
+    transition: transform .2s ease;
+  }
+  .car-nav:hover{ transform:scale(1.08); }
+  .car-nav:active{ transform:scale(0.92); }
+
+  .car-dots{ display:flex; gap:6px; justify-content:center; flex-wrap:wrap; max-width:520px; margin:0 auto 34px; }
+  .dot{ width:8px; height:8px; border-radius:50%; border:none; padding:0; cursor:pointer; background:rgba(127,150,170,0.35); transition: all .25s ease; }
+  .dot.active{ width:22px; border-radius:5px; background:linear-gradient(120deg,#ffffff,var(--accent2)); box-shadow:0 2px 6px rgba(120,170,200,0.4); }
+
+  .thumb-wrap{ position:relative; width:100%; aspect-ratio:16/9; overflow:hidden; background:#e7edf2;}
+  .thumb-wrap img{ width:100%; height:100%; object-fit:cover; display:block; }
+  .del-btn{
+    position:absolute; top:10px; right:10px; width:30px; height:30px; border-radius:10px;
+    background:rgba(255,255,255,0.7); border:1px solid rgba(255,255,255,0.9); color:#4a5560;
+    cursor:pointer; font-size:14px; display:flex; align-items:center; justify-content:center;
+    backdrop-filter: blur(8px); transition: all .2s ease; box-shadow:0 2px 8px rgba(31,45,61,0.15);
+  }
+  .del-btn:hover{ background:#e8544a; color:#fff; }
+  .card-body{ padding:16px 18px 18px; }
+  .card-body h3{ font-family:'Outfit', sans-serif; font-size:15px; font-weight:600; margin-bottom:4px; }
+  .card-body p{ font-size:12px; color:var(--muted); line-height:1.5; }
+  .card-body .date{ margin-top:8px; font-size:11px; color:#9aa5b0; letter-spacing:0.3px; }
+
+  .empty{ text-align:center; padding:70px 20px; color:var(--muted); }
+  .empty .emoji{ font-size:34px; margin-bottom:12px; }
+
+  /* ---------- add form ---------- */
+  .form-card{ padding:32px; max-width:520px; margin:0 auto; }
+  .form-card h2{ font-family:'Outfit', sans-serif; font-size:20px; font-weight:600; margin-bottom:6px; }
+  .form-card .sub{ color:var(--muted); font-size:13px; margin-bottom:24px; }
+  .field{ margin-bottom:18px; }
+  .field label{ display:block; font-size:12px; font-weight:600; color:var(--muted); margin-bottom:7px; text-transform:uppercase; letter-spacing:0.5px; }
+  .field input[type=text], .field textarea{
+    width:100%; background:rgba(255,255,255,0.55); border:1px solid rgba(255,255,255,0.8);
+    color:var(--text); padding:12px 15px; border-radius:12px; font-family:inherit; font-size:14px;
+    transition: border-color .2s ease; box-shadow: inset 0 1px 2px rgba(31,45,61,0.05);
+  }
+  .field input[type=text]:focus, .field textarea:focus{ outline:none; border-color:var(--accent); }
+  .field textarea{ resize:vertical; min-height:70px; }
+
+  .file-drop{
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px;
+    border:1.5px dashed rgba(127,184,212,0.6); border-radius:16px; padding:26px 16px;
+    background:rgba(255,255,255,0.4); cursor:pointer; text-align:center; margin-bottom:16px;
+    transition: border-color .2s ease, background .2s ease;
+  }
+  .file-drop:hover{ border-color:var(--accent); background:rgba(255,255,255,0.6); }
+  .file-drop .ic{ font-size:22px; }
+  .file-drop .t1{ font-size:13px; font-weight:600; color:var(--text); }
+  .file-drop .t2{ font-size:11px; color:var(--muted); }
+  #inpFile{ display:none; }
+
+  .preview-box{ margin-bottom:16px; border-radius:14px; overflow:hidden; aspect-ratio:16/9; background:#e7edf2; display:none; align-items:center; justify-content:center; color:var(--muted); font-size:12px; position:relative;}
+  .preview-box.show{ display:flex; }
+  .preview-box img{ width:100%; height:100%; object-fit:cover; }
+  .preview-clear{
+    position:absolute; top:8px; right:8px; width:26px; height:26px; border-radius:8px;
+    background:rgba(255,255,255,0.85); border:none; cursor:pointer; font-size:13px; color:#4a5560;
+  }
+
+  .submit-btn{
+    width:100%; padding:14px; border:none; border-radius:14px; cursor:pointer;
+    font-family:'Outfit', sans-serif; font-weight:600; font-size:14px; color:#1a2027;
+    background:linear-gradient(120deg, #ffffff, var(--accent2));
+    box-shadow: 0 6px 20px rgba(120,170,200,0.4), inset 0 1px 0 rgba(255,255,255,0.9);
+    transition: filter .2s ease, transform .2s ease;
+  }
+  .submit-btn:hover{ filter:brightness(1.03); transform:translateY(-1px); }
+  .submit-btn:disabled{ opacity:0.5; cursor:not-allowed; }
+  .msg{ font-size:12px; margin-top:12px; text-align:center; }
+  .msg.ok{ color:#2f8f5b; }
+  .msg.err{ color:#c2483d; }
+
+  /* ---------- about ---------- */
+  .about-card{ padding:34px; max-width:600px; margin:0 auto; text-align:center; }
+  .about-card h2{ font-family:'Outfit', sans-serif; font-size:20px; font-weight:600; margin-bottom:16px; }
+  .about-card p{ color:var(--muted); font-size:14px; line-height:1.75; }
+
+  footer{ text-align:center; color:#9aa5b0; font-size:12px; margin-top:64px; }
+
+  /* ---------- modal ---------- */
+  .modal-bg{
+    position:fixed; inset:0; background:rgba(220,230,238,0.55); backdrop-filter: blur(6px);
+    display:none; align-items:center; justify-content:center; z-index:50; padding:20px;
+  }
+  .modal-bg.show{ display:flex; }
+  .modal{ padding:28px; max-width:340px; width:100%; text-align:center; }
+  .modal h3{ font-family:'Outfit', sans-serif; font-size:16px; font-weight:600; margin-bottom:16px; }
+  .modal input{
+    width:100%; background:rgba(255,255,255,0.6); border:1px solid rgba(255,255,255,0.9);
+    color:var(--text); padding:12px 15px; border-radius:12px; font-family:inherit; font-size:14px; margin-bottom:14px;
+  }
+  .modal .row{ display:flex; gap:8px; }
+  .modal button{ flex:1; padding:11px; border-radius:12px; border:none; font-weight:600; cursor:pointer; font-size:13px; }
+  .modal .cancel{ background:rgba(255,255,255,0.5); color:var(--text); }
+  .modal .confirm{ background:linear-gradient(120deg, #ffffff, var(--accent2)); color:#1a2027; }
+  .modal .confirm:disabled{ opacity:0.5; cursor:not-allowed; }
+  .modal .lockout{ font-size:12px; color:#c2483d; margin-top:-6px; margin-bottom:12px; display:none; }
+  .modal .lockout.show{ display:block; }
+
+  button:focus-visible, input:focus-visible, textarea:focus-visible, [tabindex]:focus-visible{
+    outline:2px solid var(--accent); outline-offset:2px;
+  }
+
+  .count-up{ display:inline-block; }
+
+  @media (max-width:520px){
+    nav.tabs{ width:100%; justify-content:flex-start; }
+  }
+</style>
+</head>
+<body>
+
+<div class="blob-field">
+  <div class="blob b1"></div>
+  <div class="blob b2"></div>
+  <div class="blob b3"></div>
+  <div class="blob b4"></div>
+</div>
+
+<div class="wrap">
+
+  <header class="top">
+    <div class="brand">
+      <div class="brand-block"></div>
+      <div class="brand-name">MC<span>·</span>Miniatures</div>
+    </div>
+    <div style="display:flex; gap:8px; align-items:center;">
+      <button class="lock-btn" id="lockBtn" onclick="onLockClick()">
+        <span id="lockIcon">🔒</span> <span id="lockLabel">Visiteur</span>
+      </button>
+    </div>
+  </header>
+
+  <nav class="tabs" id="tabs">
+    <button data-tab="accueil" class="active"><span class="tab-bg"></span>Accueil</button>
+    <button data-tab="galerie"><span class="tab-bg"></span>Galerie</button>
+    <button data-tab="ajouter" id="tabAjouterBtn" style="display:none;"><span class="tab-bg"></span>Ajouter</button>
+    <button data-tab="apropos"><span class="tab-bg"></span>À propos</button>
+  </nav>
+
+  <!-- ACCUEIL -->
+  <section class="panel active" id="panel-accueil">
+    <div class="hero glass" id="heroBox">
+      <div class="spotlight" id="heroSpot"></div>
+      <div class="droplet" style="width:64px; height:64px; top:20px; right:30px;"></div>
+      <div class="droplet" style="width:26px; height:26px; bottom:26px; left:34px; animation-delay:-3s;"></div>
+      <div class="eyebrow">Portfolio · Miniatures Minecraft</div>
+      <h1>Des miniatures<br><b>qui font cliquer</b></h1>
+      <p>Une sélection de miniatures créées pour des vidéos Minecraft — survie, builds, redstone et moments épiques capturés en une image.</p>
+      <div class="hero-stats">
+        <div class="glass stat"><div class="num count-up" id="statCount" data-target="0">0</div><div class="label">Miniatures</div></div>
+        <div class="glass stat"><div class="num">100%</div><div class="label">Fait main</div></div>
+        <div class="glass stat"><div class="num">🎮</div><div class="label">Minecraft</div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- GALERIE -->
+  <section class="panel" id="panel-galerie">
+    <div class="gallery-head">
+      <h2>Galerie</h2>
+      <span class="count" id="galleryCount">0 miniature</span>
+    </div>
+
+    <div class="carousel-wrap" id="carouselWrap">
+      <button class="car-nav prev" onclick="carPrev()" aria-label="Miniature précédente">‹</button>
+      <div class="car-stage" id="carStage"></div>
+      <button class="car-nav next" onclick="carNext()" aria-label="Miniature suivante">›</button>
+    </div>
+    <div class="car-dots" id="carDots"></div>
+    <div class="empty glass" id="carEmptyMsg" style="display:none;"><div class="emoji">⛏️</div>Aucune miniature pour l'instant.</div>
+  </section>
+
+  <!-- AJOUTER (admin only) -->
+  <section class="panel" id="panel-ajouter">
+    <div class="glass form-card">
+      <div class="droplet" style="width:40px; height:40px; top:16px; right:20px;"></div>
+      <h2>Ajouter une miniature</h2>
+      <div class="sub">Publiée directement en ligne (Firebase) — visible immédiatement par tous tes visiteurs, aucune manipulation supplémentaire.</div>
+
+      <label class="file-drop" for="inpFile">
+        <div class="ic">🖼️</div>
+        <div class="t1">Choisir une image depuis ta galerie</div>
+        <div class="t2">JPG, PNG — compressée automatiquement</div>
+      </label>
+      <input type="file" id="inpFile" accept="image/*" onchange="handleFile(event)">
+
+      <div class="preview-box" id="previewBox">
+        <button class="preview-clear" onclick="clearPreview(event)">✕</button>
+        <img id="previewImg" src="">
+      </div>
+
+      <div class="field">
+        <label>Titre (optionnel)</label>
+        <input type="text" id="inpTitle" placeholder="Ex : Base survie ep.12">
+      </div>
+      <div class="field">
+        <label>Description (optionnel)</label>
+        <textarea id="inpDesc" placeholder="Contexte, style, vidéo associée..."></textarea>
+      </div>
+      <button class="submit-btn" id="submitBtn" onclick="addThumbnail()" disabled>Ajouter à la galerie</button>
+      <div class="msg" id="formMsg"></div>
+    </div>
+  </section>
+
+  <!-- APROPOS -->
+  <section class="panel" id="panel-apropos">
+    <div class="glass about-card">
+      <h2>À propos</h2>
+      <p>Ce portfolio rassemble mes créations de miniatures pour Minecraft. Chaque miniature est pensée pour raconter une histoire en un coup d'œil : contraste, lisibilité, et un peu de chaos contrôlé, comme le jeu lui-même.</p>
+    </div>
+  </section>
+
+  <footer>Portfolio miniatures Minecraft — géré par le propriétaire uniquement.</footer>
+</div>
+
+<!-- password modal -->
+<div class="modal-bg" id="modalBg">
+  <div class="glass modal">
+    <h3>🔒 Déverrouiller le mode édition</h3>
+    <input type="password" id="pwInput" placeholder="Mot de passe" onkeydown="if(event.key==='Enter')confirmUnlock()">
+    <div class="lockout" id="lockoutMsg"></div>
+    <div class="row">
+      <button class="cancel" onclick="closeModal()">Annuler</button>
+      <button class="confirm" id="confirmBtn" onclick="confirmUnlock()">Déverrouiller</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ⚠️ Mot de passe protégé par hash (SHA-256) — il n'apparaît plus en clair dans le code.
+  // Pour le changer : ouvre la console du navigateur et tape
+  //   crypto.subtle.digest('SHA-256', new TextEncoder().encode('TonNouveauMotDePasse')).then(b=>console.log([...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('')))
+  // puis colle le résultat ci-dessous.
+  const ADMIN_PASSWORD_HASH = "398685ed2fe9cc0e1b027024ee1f0a9e03f9ec7ab9ffa51770e49967ef28ff81"; // = "minecraft2026"
+  const MAX_ATTEMPTS = 5;
+  const LOCKOUT_MS = 60000;
+  const MAX_WIDTH = 640;       // largeur max de départ
+  const TARGET_BYTES = 220000; // ~220 Ko visés par image encodée
+
+  // ---------- Firebase ----------
+  // Remplace ces valeurs par celles de TON projet Firebase
+  // (Console Firebase → Paramètres du projet → tes applications → config SDK).
+  const firebaseConfig = {
+    apiKey: "AIzaSyCHl9n0AZKWN2BkxgkWylwUTJSGkzWVzd4",
+    authDomain: "portfolio-skuazii.firebaseapp.com",
+    projectId: "portfolio-skuazii",
+    messagingSenderId: "646210339742",
+    appId: "1:646210339742:web:8eb241567a44ec773f8c8f"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.firestore();
+  const itemsCol = db.collection('items');
+
+  let isAdmin = false;
+  let items = [];
+  let pendingImage = null;      // base64 de l'image en attente d'ajout
+  let pendingImageBlob = null;  // même image, en Blob (sert juste à confirmer qu'elle est prête)
+  let unsubscribeGallery = null;
+
+  // ---------- tabs ----------
+  const tabButtons = document.querySelectorAll('nav.tabs button');
+  tabButtons.forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      tabButtons.forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      document.querySelectorAll('section.panel').forEach(p=>p.classList.remove('active'));
+      document.getElementById('panel-'+btn.dataset.tab).classList.add('active');
+    });
+  });
+
+  // ---------- admin lock ----------
+  async function sha256(text){
+    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+    return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2,'0')).join('');
+  }
+  function getLockoutUntil(){ return parseInt(localGet('mc_lockout_until') || '0', 10); }
+  function getAttempts(){ return parseInt(localGet('mc_attempts') || '0', 10); }
+
+  function onLockClick(){
+    if(isAdmin){
+      isAdmin = false;
+      updateAdminUI();
+      localSet('mc_isAdmin', 'false');
+    } else {
+      document.getElementById('modalBg').classList.add('show');
+      document.getElementById('pwInput').value='';
+      document.getElementById('pwInput').focus();
+      refreshLockoutUI();
+    }
+  }
+  function closeModal(){ document.getElementById('modalBg').classList.remove('show'); }
+
+  function refreshLockoutUI(){
+    const until = getLockoutUntil();
+    const remaining = until - Date.now();
+    const lockoutEl = document.getElementById('lockoutMsg');
+    const confirmBtn = document.getElementById('confirmBtn');
+    const pwInput = document.getElementById('pwInput');
+    if(remaining > 0){
+      const secs = Math.ceil(remaining/1000);
+      lockoutEl.textContent = `Trop de tentatives. Réessaie dans ${secs}s.`;
+      lockoutEl.classList.add('show');
+      confirmBtn.disabled = true;
+      pwInput.disabled = true;
+      clearTimeout(window._lockoutTimer);
+      window._lockoutTimer = setTimeout(refreshLockoutUI, 1000);
+    } else {
+      lockoutEl.classList.remove('show');
+      confirmBtn.disabled = false;
+      pwInput.disabled = false;
+    }
+  }
+
+  async function confirmUnlock(){
+    if(getLockoutUntil() > Date.now()) return;
+    const val = document.getElementById('pwInput').value;
+    const hash = await sha256(val);
+    if(hash === ADMIN_PASSWORD_HASH){
+      isAdmin = true;
+      localSet('mc_attempts', '0');
+      updateAdminUI();
+      localSet('mc_isAdmin', 'true');
+      closeModal();
+    } else {
+      const attempts = getAttempts() + 1;
+      localSet('mc_attempts', String(attempts));
+      if(attempts >= MAX_ATTEMPTS){
+        localSet('mc_lockout_until', String(Date.now() + LOCKOUT_MS));
+        localSet('mc_attempts', '0');
+        refreshLockoutUI();
+      }
+      const input = document.getElementById('pwInput');
+      input.style.borderColor = '#c2483d';
+      input.value = '';
+      setTimeout(()=>{ input.style.borderColor=''; }, 900);
+    }
+  }
+  function updateAdminUI(){
+    const btn = document.getElementById('lockBtn');
+    document.getElementById('lockIcon').textContent = isAdmin ? '🔓' : '🔒';
+    document.getElementById('lockLabel').textContent = isAdmin ? 'Édition' : 'Visiteur';
+    btn.classList.toggle('unlocked', isAdmin);
+    document.getElementById('tabAjouterBtn').style.display = isAdmin ? '' : 'none';
+    renderGallery();
+  }
+
+  // ---------- stockage local (fonctionne aussi en fichier ouvert directement) ----------
+  // localStorage peut être bloqué par certains navigateurs quand le fichier est ouvert
+  // en double-clic (protocole file://). Dans ce cas on continue de fonctionner en mémoire
+  // le temps de la session, et le bouton "Exporter le site" permet de sauvegarder quand même.
+  function localGet(key){
+    try{ return localStorage.getItem(key); } catch(e){ return null; }
+  }
+  function localSet(key, value){
+    try{ localStorage.setItem(key, value); return true; } catch(e){ return false; }
+  }
+
+  // ---------- image handling: compress to base64, shrinking until it's light enough ----------
+  function handleFile(event){
+    const file = event.target.files[0];
+    if(!file) return;
+    const msg = document.getElementById('formMsg');
+
+    // Sécurité : on vérifie le type MIME réel du fichier, pas juste son extension.
+    if(!file.type.startsWith('image/')){
+      msg.textContent = "Ce fichier n'est pas une image valide.";
+      msg.className = 'msg err';
+      event.target.value = '';
+      return;
+    }
+    if(file.size > 20 * 1024 * 1024){
+      msg.textContent = "Fichier trop volumineux (max 20 Mo avant compression).";
+      msg.className = 'msg err';
+      event.target.value = '';
+      return;
+    }
+
+    msg.textContent = "Compression de l'image...";
+    msg.className = 'msg';
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        let width = Math.min(MAX_WIDTH, img.width);
+        let quality = 0.75;
+        let dataUrl = "";
+        let canvas = null;
+        // essaie plusieurs passes : réduit d'abord la qualité, puis la taille si besoin
+        for(let attempt = 0; attempt < 8; attempt++){
+          const scale = width / img.width;
+          canvas = document.createElement('canvas');
+          canvas.width = Math.max(1, Math.round(img.width * scale));
+          canvas.height = Math.max(1, Math.round(img.height * scale));
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          dataUrl = canvas.toDataURL('image/jpeg', quality);
+          if(dataUrl.length <= TARGET_BYTES || (width <= 240 && quality <= 0.4)) break;
+          if(quality > 0.45){ quality -= 0.12; }
+          else{ width = Math.round(width * 0.8); }
+        }
+        pendingImage = dataUrl;
+        canvas.toBlob(b => { pendingImageBlob = b; }, 'image/jpeg', quality);
+        document.getElementById('previewImg').src = pendingImage;
+        document.getElementById('previewBox').classList.add('show');
+        document.getElementById('submitBtn').disabled = false;
+        msg.textContent = "";
+      };
+      img.onerror = () => {
+        msg.textContent = "Impossible de lire cette image, essaie un autre fichier.";
+        msg.className = 'msg err';
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
+  function clearPreview(e){
+    e.preventDefault();
+    pendingImage = null;
+    pendingImageBlob = null;
+    document.getElementById('previewBox').classList.remove('show');
+    document.getElementById('inpFile').value = '';
+    document.getElementById('submitBtn').disabled = true;
+  }
+
+  // ---------- galerie : synchronisée en direct avec Firestore ----------
+  // onSnapshot écoute la base en continu : dès qu'une miniature est ajoutée
+  // ou supprimée (par toi, depuis n'importe quel appareil), tous les visiteurs
+  // la voient apparaître/disparaître sans recharger la page.
+  function loadGallery(){
+    if(unsubscribeGallery) unsubscribeGallery();
+    unsubscribeGallery = itemsCol.orderBy('createdAt', 'asc').onSnapshot(
+      snap => {
+        items = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        renderGallery();
+      },
+      err => {
+        console.error('Firestore onSnapshot error:', err);
+        const msg = document.getElementById('formMsg');
+        if(msg){
+          msg.textContent = "Impossible de charger la galerie (vérifie ta config Firebase / connexion).";
+          msg.className = 'msg err';
+        }
+      }
+    );
+  }
+
+  let carIndex = 0;
+  let displayList = [];
+
+  function renderGallery(){
+    animateCount(document.getElementById('statCount'), items.length);
+    document.getElementById('galleryCount').textContent = items.length + (items.length>1 ? ' miniatures' : ' miniature');
+
+    displayList = items.slice().reverse();
+    const wrap = document.getElementById('carouselWrap');
+    const dotsEl = document.getElementById('carDots');
+    const emptyEl = document.getElementById('carEmptyMsg');
+
+    if(displayList.length === 0){
+      wrap.style.display = 'none';
+      dotsEl.style.display = 'none';
+      emptyEl.style.display = '';
+      document.getElementById('carStage').innerHTML = '';
+      return;
+    }
+    wrap.style.display = '';
+    dotsEl.style.display = '';
+    emptyEl.style.display = 'none';
+    if(carIndex >= displayList.length) carIndex = 0;
+
+    renderCarouselStage();
+    renderDots();
+  }
+
+  // Empile les miniatures autour de la miniature centrale : la centrale est nette,
+  // celles derrière (gauche/droite) sont réduites, floutées et moins opaques.
+  function renderCarouselStage(){
+    const stage = document.getElementById('carStage');
+    const n = displayList.length;
+    stage.innerHTML = '';
+    const used = new Set();
+    // Décalage horizontal entre miniatures : lu depuis la variable CSS --tx-offset,
+    // qui grandit avec l'écran (clamp en vw), pour que l'empilement reste proportionné
+    // aussi bien sur mobile que sur un grand écran de bureau.
+    const txOffset = parseFloat(getComputedStyle(stage).getPropertyValue('--tx-offset')) || 118;
+    // ordre du plus proche au plus loin du centre, pour bien choisir la version
+    // "nette" d'une miniature si le nombre d'items est petit (peu de doublons).
+    [0, -1, 1, -2, 2].forEach(off => {
+      const idx = ((carIndex + off) % n + n) % n;
+      if(used.has(idx)) return;
+      used.add(idx);
+      const it = displayList[idx];
+      const absOff = Math.abs(off);
+      const scale = 1 - absOff * 0.16;
+      const tx = off * txOffset;
+      const blur = absOff * 4;
+      const opacity = off === 0 ? 1 : (absOff === 1 ? 0.55 : 0.28);
+
+      const slot = document.createElement('div');
+      slot.className = 'car-slot';
+      slot.style.zIndex = String(10 - absOff);
+      slot.style.transform = `translate(-50%,-50%) translateX(${tx}px) scale(${scale})`;
+      slot.style.filter = `blur(${blur}px)`;
+      slot.style.opacity = String(opacity);
+      slot.innerHTML = `
+        <div class="glass car-card-inner">
+          <div class="thumb-wrap">
+            <img src="${it.image}" alt="${escapeAttr(it.title || 'Miniature Minecraft')}" loading="lazy" decoding="async" draggable="false">
+            ${(off === 0 && isAdmin) ? `<button class="del-btn" onclick="deleteThumbnail('${it.id}')" title="Supprimer">✕</button>` : ''}
+          </div>
+          ${(off === 0 && (it.title || it.desc)) ? `
+          <div class="card-body">
+            ${it.title ? `<h3>${escapeHtml(it.title)}</h3>` : ''}
+            ${it.desc ? `<p>${escapeHtml(it.desc)}</p>` : ''}
+            <div class="date">${it.date}</div>
+          </div>` : ''}
+        </div>`;
+      if(off !== 0){
+        slot.style.cursor = 'pointer';
+        slot.addEventListener('click', () => carGoTo(idx));
+      }
+      stage.appendChild(slot);
+    });
+  }
+
+  function renderDots(){
+    const dotsEl = document.getElementById('carDots');
+    dotsEl.innerHTML = displayList.map((it, i) =>
+      `<button class="dot ${i === carIndex ? 'active' : ''}" onclick="carGoTo(${i})" aria-label="Aller à la miniature ${i+1}"></button>`
+    ).join('');
+  }
+
+  function carPrev(){
+    const n = displayList.length;
+    if(n === 0) return;
+    carIndex = (carIndex - 1 + n) % n;
+    renderCarouselStage();
+    renderDots();
+  }
+  function carNext(){
+    const n = displayList.length;
+    if(n === 0) return;
+    carIndex = (carIndex + 1) % n;
+    renderCarouselStage();
+    renderDots();
+  }
+  function carGoTo(i){
+    carIndex = i;
+    renderCarouselStage();
+    renderDots();
+  }
+
+  // Navigation clavier (← →) quand l'onglet Galerie est ouvert, et glissement tactile.
+  document.addEventListener('keydown', (e) => {
+    if(!document.getElementById('panel-galerie').classList.contains('active')) return;
+    if(e.key === 'ArrowLeft') carPrev();
+    if(e.key === 'ArrowRight') carNext();
+  });
+  // Réajuste l'empilement quand la fenêtre est redimensionnée (ex: agrandissement de la fenêtre),
+  // pour que la taille des miniatures et leur espacement restent cohérents en direct.
+  let carResizeTimer = null;
+  window.addEventListener('resize', () => {
+    clearTimeout(carResizeTimer);
+    carResizeTimer = setTimeout(() => {
+      if(document.getElementById('panel-galerie').classList.contains('active') && displayList.length){
+        renderCarouselStage();
+      }
+    }, 120);
+  });
+
+  (function initCarouselSwipe(){
+    const stage = document.getElementById('carStage');
+    let startX = null;
+    stage.addEventListener('pointerdown', e => { startX = e.clientX; });
+    stage.addEventListener('pointerup', e => {
+      if(startX === null) return;
+      const dx = e.clientX - startX;
+      if(dx > 40) carPrev();
+      else if(dx < -40) carNext();
+      startX = null;
+    });
+  })();
+
+  // Compte les miniatures avec une petite animation, plutôt qu'un chiffre statique.
+  function animateCount(el, target){
+    if(!el) return;
+    const start = parseInt(el.dataset.target || '0', 10);
+    if(start === target){ el.textContent = target; return; }
+    el.dataset.target = target;
+    const duration = 500, startTime = performance.now();
+    function tick(now){
+      const p = Math.min(1, (now - startTime) / duration);
+      el.textContent = Math.round(start + (target - start) * (1 - Math.pow(1-p, 3)));
+      if(p < 1) requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
+  }
+
+  function escapeHtml(str){
+    return (str||'').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  }
+  function escapeAttr(str){ return escapeHtml(str); }
+
+  async function addThumbnail(){
+    if(!isAdmin) return;
+    const title = document.getElementById('inpTitle').value.trim();
+    const desc = document.getElementById('inpDesc').value.trim();
+    const msg = document.getElementById('formMsg');
+    const submitBtn = document.getElementById('submitBtn');
+
+    if(!pendingImage || !pendingImageBlob){
+      msg.textContent = "Choisis d'abord une image.";
+      msg.className = 'msg err';
+      return;
+    }
+
+    submitBtn.disabled = true;
+    msg.textContent = "Publication en ligne...";
+    msg.className = 'msg';
+
+    try{
+      // L'image est déjà compressée en base64 (pendingImage) : on la stocke
+      // directement dans le document Firestore, pas besoin de Firebase Storage
+      // (qui nécessite le plan payant "Blaze").
+      await itemsCol.add({
+        image: pendingImage,
+        title, desc,
+        date: new Date().toLocaleDateString('fr-FR', {day:'2-digit', month:'short', year:'numeric'}),
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        pwHash: ADMIN_PASSWORD_HASH
+      });
+
+      msg.textContent = "Miniature publiée ✓ — visible en ligne immédiatement.";
+      msg.className = 'msg ok';
+      document.getElementById('inpTitle').value='';
+      document.getElementById('inpDesc').value='';
+      clearPreview({preventDefault:()=>{}});
+    } catch(e){
+      console.error('addThumbnail error:', e);
+      msg.textContent = "Échec de la publication (vérifie ta config Firebase / connexion / règles de sécurité).";
+      msg.className = 'msg err';
+      submitBtn.disabled = false;
+    }
+  }
+
+  async function deleteThumbnail(id){
+    if(!isAdmin) return;
+    const it = items.find(x => x.id === id);
+    if(!it) return;
+    try{
+      await itemsCol.doc(id).delete();
+    } catch(e){
+      console.error('deleteThumbnail error:', e);
+      alert("Impossible de supprimer cette miniature (vérifie ta connexion / règles de sécurité).");
+    }
+  }
+
+  // ---------- spotlight du hero (suit le curseur) ----------
+  const heroBox = document.getElementById('heroBox');
+  const heroSpot = document.getElementById('heroSpot');
+  if(heroBox && heroSpot && !window.matchMedia('(prefers-reduced-motion: reduce)').matches){
+    heroBox.addEventListener('pointermove', (e)=>{
+      const r = heroBox.getBoundingClientRect();
+      heroSpot.style.setProperty('--mx', ((e.clientX-r.left)/r.width*100)+'%');
+      heroSpot.style.setProperty('--my', ((e.clientY-r.top)/r.height*100)+'%');
+    });
+  }
+
+  // ---------- init ----------
+  (function init(){
+    isAdmin = localGet('mc_isAdmin') === 'true';
+    updateAdminUI();
+    loadGallery();
+    refreshLockoutUI();
+  })();
+</script>
+</body>
+</html>
