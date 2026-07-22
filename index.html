@@ -1810,6 +1810,18 @@
     );
   }
 
+  // ---------- formatage abrégé du nombre d'abonnés (ex: 1260 -> "1,26 k") ----------
+  function formatSubs(n){
+    n = Number(n) || 0;
+    if(n >= 1000000){
+      return (n/1000000).toLocaleString('fr-FR', {maximumFractionDigits:2}) + ' M';
+    }
+    if(n >= 1000){
+      return (n/1000).toLocaleString('fr-FR', {maximumFractionDigits:2}) + ' k';
+    }
+    return n.toLocaleString('fr-FR');
+  }
+
   function renderAvis(){
     const grid = document.getElementById('avisGrid');
     const empty = document.getElementById('avisEmpty');
@@ -1826,8 +1838,7 @@
     if(empty) empty.style.display = 'none';
 
     grid.innerHTML = avisList.map(a => {
-      const subsNum = Number(a.subs) || 0;
-      const subs = subsNum.toLocaleString('fr-FR');
+      const subs = formatSubs(a.subs);
       const photo = isSafeImageSrc(a.photo) ? a.photo : '';
       const delBtn = isAdmin
         ? `<button class="del-btn" onclick="deleteAvis('${a.id}')" title="Supprimer">✕</button>`
